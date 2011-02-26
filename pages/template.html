@@ -1,0 +1,45 @@
+<html>
+<head>
+    <title>{{ title }}</title>
+    <link type="text/css" rel="stylesheet" href="/themes/journalist/style.css"/>
+</head>
+<body>
+    <div id="container" class="group">
+        <h1><a href="/">EI011</a> of <a href="http://www.hust.edu.cn/">HUST</a></h1>
+        <div id="navigation" class="group">
+            <div class="alignright">
+                    
+
+            </div>
+        </div>
+        <div id="bubble">
+            <p>hust ei011 alumni internal use only.</p>
+        </div>
+        {{ main }}
+        <div id="sidebar">
+            <div id="pages">
+                <h3>{{ greeting }}</h3>
+                <ul>
+                    <li><a href="/">home</a></li>
+                    <li><a href="/history">history</a></li>
+                    <li><a href="/about">about</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div id="footer">
+        <p>
+            Ver. 1.4 by <a href="http://about.me/shirui.cheng">Shirui Cheng</a> @ 2011 with 
+            <a href="http://theme.wordpress.com/themes/journalist/">The Journalist v1.9</a> theme and
+            <a href="http://icant.co.uk/csstablegallery/tables/33.php">Winter Blues</a> table
+        </p>
+        <p>
+            Powered by <a href="http://code.google.com/appengine/">Google App Engine</a> and 
+            <a href="http://deron.meranda.us/python/demjson/">demjson</a>
+        </p>
+        <p>
+            Generated @ {{ now }}
+        </p>
+    </div>
+</body>
+</html>

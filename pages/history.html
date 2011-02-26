@@ -1,0 +1,38 @@
+<div id="content" class="group">
+    <h2>Brower History</h2>
+    <form action="/history" method="get">
+        Jump to (0 ~ {{ last }}): 
+        <input type="text" name="offset" value={{ offset }} size="3">
+        <input type="submit" value="Go">
+    </form>
+    {% if prev %}
+        <a href="/history?direction=prev&offset={{ offset }}&num={{ num }}">prev</a>
+    {% endif %}
+    {% if next %}
+        <a href="/history?direction=next&offset={{ offset }}&num={{ num }}">next</a>
+    {% endif %}
+</div>
+<div id="content" class="group">
+    <table>
+        <thead>
+            <tr>
+                <th scope="col">index</th>
+                <th scope="col">timestamp</th>
+                <th scope="col">id</th>
+                <th scope="col">message</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr class="{% cycle even,odd %}">
+                <th scope="row">{{ log.index }}</td>
+                <td>{{ log.timestamp }}</td>
+                <td>{{ log.nickname }}..:</td>
+                <td>{{ log.msg }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+</div>
