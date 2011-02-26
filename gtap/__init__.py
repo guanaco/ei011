@@ -1,253 +1,305 @@
 # -*- coding: utf-8 -*-
 # Copyright under  the latest Apache License 2.0
 
-import wsgiref.handlers, urlparse, base64, logging
-from cgi import parse_qsl
-from google.appengine.ext import webapp
-from google.appengine.api import urlfetch, urlfetch_errors
-from wsgiref.util import is_hop_by_hop
-from uuid import uuid4
-import oauth
+from google.appengine.api import urlfetch
+from google.appengine.ext import db
+
+from cgi import parse_qs,parse_qsl
+from hashlib import sha1, sha256, sha512
+from hmac import new as hmac
+from random import getrandbits
+from time import time
+from urllib import urlencode,quote as urlquote,unquote as urlunquote
+import urlparse, logging, base64
+from Crypto.Cipher import AES
 
 gtap_version = '0.4.1'
 
-CONSUMER_KEY = 'xzR7LOq6Aeq8uAaGORJHGQ'
-CONSUMER_SECRET = 'bCgaGEfejtE9mzq5pTMZngjnjd6rRL7hf2WBFjT4'
+CONSUMER_KEY = 'RreuoIQVri11vTOePRrQ'
+CONSUMER_SECRET = 'flTg2wfpAbwqxmt6HvSm4St4Nez0O6kMOhqxlHfNFw0'
 
 ENFORCE_GZIP = True
 
-gtap_message = """
-    <html>
-        <head>
-        <title>GAE Twitter API Proxy</title>
-        <link href='https://appengine.google.com/favicon.ico' rel='shortcut icon' type='image/x-icon' />
-        <style>body { padding: 20px 40px; font-family: Verdana, Helvetica, Sans-Serif; font-size: medium; }</style>
-        </head>
-        <body><h2>GTAP v#gtap_version# is running!</h2></p>
-        <p><a href='/oauth/session'><img src='/static/sign-in-with-twitter.png' border='0'></a> <== Need Fuck GFW First!! 
-        or <a href='/oauth/change'>change your key here</a></p>
-        <p>This is a simple solution on Google App Engine which can proxy the HTTP request to twitter's official REST API url.</p>
-        <p><font color='red'><b>Don't forget the \"/\" at the end of your api proxy address!!!.</b></font></p>
-    </body></html>
-    """
+# the block size for the cipher object; must be 16, 24, or 32 for AES
+BLOCK_SIZE = 32
 
-def success_output(handler, content, content_type='text/html'):
-    handler.response.status = '200 OK'
-    handler.response.headers.add_header('GTAP-Version', gtap_version)
-    handler.response.headers.add_header('Content-Type', content_type)
-    handler.response.out.write(content)
+# the character used for padding--with a block cipher such as AES, the value
+# you encrypt must be a multiple of BLOCK_SIZE in length.  This character is
+# used to ensure that your value is always a multiple of BLOCK_SIZE
+PADDING = '{'
 
-def error_output(handler, content, content_type='text/html', status=503):
-    handler.response.set_status(503)
-    handler.response.headers.add_header('GTAP-Version', gtap_version)
-    handler.response.headers.add_header('Content-Type', content_type)
-    handler.response.out.write("Gtap Server Error:<br />")
-    return handler.response.out.write(content)
+# one-liner to sufficiently pad the text to be encrypted
+pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING
 
-def compress_buf(buf):
-    zbuf = StringIO.StringIO()
-    zfile = gzip.GzipFile(None, 'wb', 9, zbuf)
-    zfile.write(buf)
-    zfile.close()
-    return zbuf.getvalue()
+# one-liners to encrypt/encode and decrypt/decode a string
+# encrypt with AES, encode with base64
+EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
+DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(PADDING)
 
-class MainPage(webapp.RequestHandler):
 
-    def conver_url(self, orig_url):
-        (scm, netloc, path, params, query, _) = urlparse.urlparse(orig_url)
-        
-        path_parts = path.split('/')
-        
-        if path_parts[1] == 'api' or path_parts[1] == 'search':
-            sub_head = path_parts[1]
-            path_parts = path_parts[2:]
-            path_parts.insert(0,'')
-            new_path = '/'.join(path_parts).replace('//','/')
-            new_netloc = sub_head + '.twitter.com'
-        else:
-            new_path = path
-            new_netloc = 'twitter.com'
+class OAuthException(Exception):
+    pass
+
+class AuthTokenModel(db.Model):
+
+    username = db.StringProperty(required=True)
+    token    = db.StringProperty(required=True)
+    secret   = db.StringProperty(required=True)
+    service  = db.StringProperty(required=True)
+    created  = db.DateTimeProperty(auto_now_add=True)
+
+    def create_aes(self, self_key):
+        data = hmac(
+            self.username, self_key, sha512
+            ).digest()
+        return AES.new(data[:32], AES.MODE_CBC,data[32:32])
+ 
+    def encrypt(self, self_key):
+        self.token  = EncodeAES(self.create_aes(self_key) , self.token)
+        self.secret = EncodeAES(self.create_aes(self_key),  self.secret)
     
-        new_url = urlparse.urlunparse(('https', new_netloc, new_path.replace('//','/'), params, query, ''))
-        return new_url, new_path
-
-    def parse_auth_header(self, headers):
-        username = None
-        password = None
-        
-        if 'Authorization' in headers :
-            auth_header = headers['Authorization']
-            auth_parts = auth_header.split(' ')
-            user_pass_parts = base64.b64decode(auth_parts[1]).split(':')
-            username = user_pass_parts[0]
-            password = user_pass_parts[1]
-    
-        return username, password
-
-    def do_proxy(self, method):
-        orig_url = self.request.url
-        orig_body = self.request.body
-
-        new_url,new_path = self.conver_url(orig_url)
-
-        if new_path == '/' or new_path == '':
-            global gtap_message
-            gtap_message = gtap_message.replace('#gtap_version#', gtap_version)
-            return success_output(self, gtap_message )
-        
-        username, password = self.parse_auth_header(self.request.headers)
-        user_access_token = None
-        
-        callback_url = "%s/oauth/verify" % self.request.host_url
-        client = oauth.TwitterClient(CONSUMER_KEY, CONSUMER_SECRET, callback_url)
-
-        if username is None :
-            protected=False
-            user_access_token, user_access_secret = '', ''
-        else:
-            protected=True
-            user_access_token, user_access_secret  = client.get_access_from_db(username, password)
-            if user_access_token is None :
-                return error_output(self, 'Can not find this user from db')
-        
-        additional_params = dict([(k,v) for k,v in parse_qsl(orig_body)])
-
-        use_method = urlfetch.GET if method=='GET' else urlfetch.POST
-
-        try :
-            data = client.make_request(url=new_url, token=user_access_token, secret=user_access_secret, 
-                                   method=use_method, protected=protected, 
-                                   additional_params = additional_params)
-        except Exception,error_message:
-            logging.debug( error_message )
-            error_output(self, content=error_message)
-        else :
-            #logging.debug(data.headers)
-            self.response.headers.add_header('GTAP-Version', gtap_version)
-            for res_name, res_value in data.headers.items():
-                if is_hop_by_hop(res_name) is False and res_name!='status':
-                    self.response.headers.add_header(res_name, res_value)
-            self.response.out.write(data.content)
-
-    def post(self):
-        self.do_proxy('POST')
-    
-    def get(self):
-        self.do_proxy('GET')
+    def decrypt(self, self_key):
+        logging.debug('xx_token:%s' % self.token)
+        self.token  = DecodeAES(self.create_aes(self_key), self.token)
+        logging.debug('yy_token:%s' % self.token)
+        self.secret = DecodeAES(self.create_aes(self_key), self.secret)
 
 
-class OauthPage(webapp.RequestHandler):
+class OAuthClient():
 
-    def get(self, mode=""):
-        callback_url = "%s/oauth/verify" % self.request.host_url
-        client = oauth.TwitterClient(CONSUMER_KEY, CONSUMER_SECRET, callback_url)
+    def __init__(self, service_name, consumer_key, consumer_secret, request_url,
+               access_url, callback_url=None):
+        """ Constructor."""
 
-        if mode=='session':
-            # step C Consumer Direct User to Service Provider
-            try:
-                url = client.get_authorization_url()
-                self.redirect(url)
-            except Exception,error_message:
-                self.response.out.write( error_message )
+        self.service_name = service_name
+        self.consumer_key = consumer_key
+        self.consumer_secret = consumer_secret
+        self.request_url = request_url
+        self.access_url = access_url
+        self.callback_url = callback_url
 
+    def prepare_request(self, url, token="", secret="", additional_params=None,
+                      method=urlfetch.GET):
+        """Prepare Request.
 
-        if mode=='verify':
-            # step D Service Provider Directs User to Consumer
-            auth_token = self.request.get("oauth_token")
-            auth_verifier = self.request.get("oauth_verifier")
+        Prepares an authenticated request to any OAuth protected resource.
 
-            # step E Consumer Request Access Token 
-            # step F Service Provider Grants Access Token
-            try:
-                access_token, access_secret, screen_name = client.get_access_token(auth_token, auth_verifier)
-                self_key = '%s' % uuid4()
-                # Save the auth token and secret in our database.
-                client.save_user_info_into_db(username=screen_name, password=self_key, 
-                                              token=access_token, secret=access_secret)
-                show_key_url = '%s/oauth/showkey?name=%s&key=%s' % (
-                                                                       self.request.host_url, 
-                                                                       screen_name, self_key)
-                self.redirect(show_key_url)
-            except Exception,error_message:
-                logging.debug("oauth_token:" + auth_token)
-                logging.debug("oauth_verifier:" + auth_verifier)
-                logging.debug( error_message )
-                self.response.out.write( error_message )
-        
-        if mode=='showkey':
-            screen_name = self.request.get("name")
-            self_key = self.request.get("key")
-            out_message = """
-                <html><head><title>GTAP</title>
-                <style>body { padding: 20px 40px; font-family: Courier New; font-size: medium; }</style>
-                </head><body><p>
-                your twitter's screen name : <b>#screen_name#</b> <br /><br />
-                the Key of this API : <b>#self_key#</b> <a href="#api_host#/oauth/change?name=#screen_name#&key=#self_key#">you can change it now</a><br /><br />
-                </p>
-                <p>
-                In the third-party client of Twitter which support Custom API address,<br />
-                set the API address as <b>#api_host#/</b> or <b>#api_host#/api/1/</b> , <br />
-                and set Search API address as <b>#api_host#/search/</b> . <br />
-                Then you must use the <b>Key</b> as your password when Sign-In in these clients.
-                </p></body></html>
-                """
-            out_message = out_message.replace('#api_host#', self.request.host_url)
-            out_message = out_message.replace('#screen_name#', screen_name)
-            out_message = out_message.replace('#self_key#', self_key)
-            self.response.out.write( out_message )
-        
-        if mode=='change':
-            screen_name = self.request.get("name")
-            self_key = self.request.get("key")
-            out_message = """
-                <html><head><title>GTAP</title>
-                <style>body { padding: 20px 40px; font-family: Courier New; font-size: medium; }</style>
-                </head><body><p><form method="post" action="%s/oauth/changekey">
-                your screen name of Twitter : <input type="text" name="name" size="20" value="%s"> <br /><br />
-                your old key of this API : <input type="text" name="old_key" size="50" value="%s"> <br /><br />
-                define your new key of this API : <input type="text" name="new_key" size="50" value=""> <br /><br />
-                <input type="submit" name="_submit" value="Change the Key">
-                </form></p></body></html>
-                """ % (self.request.host_url, screen_name, self_key)
-            self.response.out.write( out_message )
+        Returns the payload of the request.
+        """
+
+        def encode(text):
+            return urlquote(str(text), "")
+
+        params = {
+            "oauth_consumer_key": self.consumer_key,
+            "oauth_signature_method": "HMAC-SHA1",
+            "oauth_timestamp": str(int(time())),
+            "oauth_nonce": str(getrandbits(64)),
+            "oauth_version": "1.0"
+        }
+
+        if token:
+            params["oauth_token"] = token
+        elif self.callback_url:
+            params["oauth_callback"] = self.callback_url
+
+        if additional_params:
+            params.update(additional_params)
+
+        for k,v in params.items():
+            if isinstance(v, unicode):
+                params[k] = v.encode('utf8')
+            if type(v) is str:
+                params[k] = params[k].replace("~","~~~")
             
-    def post(self, mode=''):
+        # Join all of the params together.
+        params_str = "&".join(["%s=%s" % (encode(k), encode(params[k]))
+                               for k in sorted(params)])
+
+        # Join the entire message together per the OAuth specification.
+        message = "&".join(["GET" if method == urlfetch.GET else "POST",
+                            encode(url), encode(params_str)])
+
+        # Create a HMAC-SHA1 signature of the message.
+        key = "%s&%s" % (self.consumer_secret, secret) # Note compulsory "&".
+        message = message.replace('%257E%257E%257E', '~')
+        signature = hmac(key, message, sha1)
+        digest_base64 = signature.digest().encode("base64").strip()
+        params["oauth_signature"] = digest_base64
+
+        # Construct the request payload and return it
+        return urlencode(params).replace('%7E%7E%7E', '~')
+    
+    
+    def make_async_request(self, url, token="", secret="", additional_params=None,
+                   protected=False, method=urlfetch.GET):
+        """Make Request.
+
+        Make an authenticated request to any OAuth protected resource.
+
+        If protected is equal to True, the Authorization: OAuth header will be set.
+
+        A urlfetch response object is returned.
+        """
         
-        callback_url = "%s/oauth/verify" % self.request.host_url
-        client = oauth.TwitterClient(CONSUMER_KEY, CONSUMER_SECRET, callback_url)
+        (scm, netloc, path, params, query, _) = urlparse.urlparse(url)
+        url = None
+        query_params = None
+        if query:
+            query_params = dict([(k,v) for k,v in parse_qsl(query)])
+            additional_params.update(query_params)
+        url = urlparse.urlunparse(('https', netloc, path, params, '', ''))
         
-        if mode=='changekey':
-            screen_name = self.request.get("name")
-            old_key = self.request.get("old_key")
-            new_key = self.request.get("new_key")
-            user_access_token, user_access_secret  = client.get_access_from_db(screen_name, old_key)
-            
-            if user_access_token is None or user_access_secret is None:
-                logging.debug("screen_name:" + screen_name)
-                logging.debug("old_key:" + old_key)
-                logging.debug("new_key:" + new_key)
-                self.response.out.write( 'Can not find user from db, or invalid old_key.' )
+        payload = self.prepare_request(url, token, secret, additional_params, method)
+
+        if method == urlfetch.GET:
+            url = "%s?%s" % (url, payload)
+            payload = None
+        headers = {"Authorization": "OAuth"} if protected else {}
+
+        rpc = urlfetch.create_rpc(deadline=10.0)
+        urlfetch.make_fetch_call(rpc, url, method=method, headers=headers, payload=payload)
+        return rpc
+
+    def make_request(self, url, token="", secret="", additional_params=None,
+                                      protected=False, method=urlfetch.GET):
+        data = self.make_async_request(url, token, secret, additional_params, protected, method).get_result()
+        
+        if data.status_code != 200:
+            logging.debug(data.status_code)
+            logging.debug(url)
+            logging.debug(token)
+            logging.debug(secret)
+            logging.debug(additional_params)
+            logging.debug(data.content)
+        return data
+  
+    def get_authorization_url(self):
+        """Get Authorization URL.
+
+        Returns a service specific URL which contains an auth token. The user
+        should be redirected to this URL so that they can give consent to be
+        logged in.
+        """
+
+        raise NotImplementedError, "Must be implemented by a subclass"
+
+    def get_access_token(self, auth_token, auth_verifier):
+        auth_token = urlunquote(auth_token)
+        auth_verifier = urlunquote(auth_verifier)
+
+        response = self.make_request(self.access_url,
+                                token=auth_token,
+                                additional_params={"oauth_verifier": auth_verifier}
+                                )
+
+        # Extract the access token/secret from the response.
+        result = self._extract_credentials(response)
+        return result['token'], result['secret'],result['screen_name']
+
+    def get_access_from_db(self, username, password):
+        result = AuthTokenModel.gql("""
+            WHERE
+                service = :1 AND
+                username = :2
+            LIMIT
+                1
+        """, self.service_name, username.lower()).get()
+
+        if not result:
+            access_token = None
+            access_secret = None
+        else:
+            result.decrypt(password)
+            if result.token[:3]=='###' and result.secret[:3]=='###':
+                access_token = result.token[3:]
+                access_secret = result.secret[3:]
             else:
-                try:
-                    client.save_user_info_into_db(username=screen_name, password=new_key, 
-                                                  token=user_access_token, secret=user_access_secret)
-                    show_key_url = '%s/oauth/showkey?name=%s&key=%s' % (
-                                                                        self.request.host_url, 
-                                                                        screen_name, new_key)
-                    self.redirect(show_key_url)
-                except Exception,error_message:
-                    logging.debug("screen_name:" + screen_name)
-                    logging.debug("old_key:" + old_key)
-                    logging.debug("new_key:" + new_key)
-                    logging.debug( error_message )
-                    self.response.out.write( error_message )
+                access_token = None
+                access_secret = None
+        return access_token, access_secret
 
-def main():
-    application = webapp.WSGIApplication( [
-        (r'/oauth/(.*)', OauthPage),
-        (r'/.*',         MainPage)
-        ], debug=True)
-    wsgiref.handlers.CGIHandler().run(application)
+    def save_user_info_into_db(self, username, password, token, secret):
+        service = self.service_name
+        res = AuthTokenModel.all().filter(
+                            'service =', service).filter('username =', username)
+        if res.count() > 0:
+            db.delete(res)
+
+        token  = '###' + token
+        secret = '###' + secret
+
+        auth = AuthTokenModel(service=service,
+                         username=username.lower(),
+                         secret=secret,
+                         token=token)
+        auth.encrypt(password)
+        auth.put()
     
-if __name__ == "__main__":
-  main()
+    def _get_auth_token(self):
+        """Get Authorization Token.
+
+        Actually gets the authorization token and secret from the service. The
+        token and secret are stored in our database, and the auth token is
+        returned.
+        """
+        response = self.make_request(self.request_url)
+        result = self._extract_credentials(response)
+
+        auth_token = result["token"]
+        #auth_secret = result["secret"]
+
+        return auth_token
+
+    def _extract_credentials(self, result):
+        """Extract Credentials.
+
+        Returns an dictionary containing the token and secret (if present).
+        Throws an Exception otherwise.
+        """
+
+        token = None
+        secret = None
+        screen_name = None
+        parsed_results = parse_qs(result.content)
+
+        if "oauth_token" in parsed_results:
+            token = parsed_results["oauth_token"][0]
+
+        if "oauth_token_secret" in parsed_results:
+            secret = parsed_results["oauth_token_secret"][0]
+
+        if "screen_name" in parsed_results:
+            screen_name = parsed_results["screen_name"][0]
+
+        if not (token and secret) or result.status_code != 200:
+            logging.error("Response Status Code is : %s" % result.status_code)
+            logging.error("Could not extract token/secret: %s" % result.content)
+            raise OAuthException("Problem talking to the service")
+
+        return {
+            "service": self.service_name,
+            "token": token,
+            "secret": secret,
+            "screen_name": screen_name
+        }
+    
+class TwitterClient(OAuthClient):
+
+    def __init__(self, consumer_key, consumer_secret, callback_url):
+        """Constructor."""
+
+        OAuthClient.__init__(self,
+                "twitter",
+                consumer_key,
+                consumer_secret,
+                "https://api.twitter.com/oauth/request_token",
+                "https://api.twitter.com/oauth/access_token",
+                callback_url)
+
+    def get_authorization_url(self):
+        """Get Authorization URL."""
+
+        token = self._get_auth_token()
+        return "https://api.twitter.com/oauth/authorize?oauth_token=%s" % token
+

@@ -1,17 +1,19 @@
 <div id="content" class="group">
-    <h2>Browse History</h2>
-    <div class="main">
-        <form action="/history?offset=0" method="get">
-            Num (1 ~ 50) per page: 
-            <input type="text" name="num" value="20" size="2">
-            <input type="submit" value="Go">
-        </form>
-    </div>
-    <h2>Twitter</h2>
-    {% if name %}
-        <p>{{ name }}<a href="/oauth/twitter/logout">(logout)</a> @ {{ location }}</p>
-        <p>API Rate Limit Status: {{ rate }}</p>
-    {% else %}
-        <p><a href="/oauth/twitter/login">login</a></p>
-    {% endif %}
+    <ul>
+        <li>
+            <h2>Browse History</h2>
+            <div class="main">
+                <form action="/history?offset=0" method="get">
+                    Num (1 ~ 50) per page: 
+                    <input type="text" name="num" value="20" size="2">
+                    <input type="submit" value="Go">
+                </form>
+            </div>
+        </li>
+        <li>
+            <h2>Twitter Proxy by <a href="http://code.google.com/p/gtap/">gtap</a>v{{ gtap_version }}</h2>
+            <li><a href='/oauth/session'>sign in</a> <== Need Fuck GFW First!!</li>
+            <li><a href='/oauth/change'>change your keys</a></li>
+            {{ gtap_output }}
+        </li>
 </div>

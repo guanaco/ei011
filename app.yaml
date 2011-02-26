@@ -1,0 +1,37 @@
+application: ei011-bot
+version: 1-5
+runtime: python
+api_version: 1
+
+handlers:
+- url: .*/favicon\.ico
+  static_files: favicon.ico
+  upload: favicon.ico
+  mime_type: image/x-icon
+
+- url: /themes
+  static_dir: themes
+
+- url: .*
+  script: ei011.py
+  
+skip_files:
+- ^(.*/)?app\.yaml
+- ^(.*/)?app\.yml
+- ^(.*/)?index\.yaml
+- ^(.*/)?index\.yml
+- ^(.*/)?#.*#
+- ^(.*/)?.*~
+- ^(.*/)?.*\.py[co]
+- ^(.*/)?.*/RCS/.*
+- ^(.*/)?\..*
+- ^(.*/)?.*\.bak
+- ^(.*/)?.*\.db$
+
+inbound_services:
+- xmpp_message
+#- xmpp_presence
+#- xmpp_subscribe
+
+builtins:
+- datastore_admin: on
