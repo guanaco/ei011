@@ -17,7 +17,7 @@ application = webapp.WSGIApplication(
     [("/", MainHandler),
      ("/history", HistoryHandler),
      ("/about", AboutHandler),
-     ("/oauth/", OauthHandler),
+     ("/oauth/(.*)", OauthHandler),
      ("/_ah/xmpp/message/chat/", XMPPHandler)],
     debug=True)
 

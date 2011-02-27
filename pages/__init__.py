@@ -19,7 +19,7 @@ class TemplateHandler(webapp.RequestHandler):
         self.response.out.write(content)
         
     def path(self, file):
-        return os.path.join(os.path.dirname(__file__), "pages/%s.html"%(file))
+        return os.path.join(os.path.dirname(__file__), "%s.html"%(file))
         
     def process(self, method):
         pass
