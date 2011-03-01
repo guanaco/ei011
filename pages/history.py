@@ -3,7 +3,7 @@
 
 from tools.database import Log
 from pages.template import TemplateHandler
-from tools.timezone import OutputDatatime
+from tools.timezone import OutputDatetime
 
 DEF_HIS_PER_PAGE = 20
 MAX_HIS_PER_PAGE = 50
@@ -69,7 +69,7 @@ class HistoryHandler(TemplateHandler):
                 <td>%s..:</td>
                 <td>%s</td>
             </tr>
-            """%(eo, log.index, OutputDatatime(log.timestamp, self.user.timezone), log.nickname, log.msg)
+            """%(eo, log.index, OutputDatetime(log.timestamp, self.user.timezone), log.jid[:log.jid.index("@")], log.msg)
             if eo == "even": eo = "odd"
             elif eo == "odd": eo = "even"            
         

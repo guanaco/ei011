@@ -32,6 +32,9 @@ DEFAULT_TZINFO = UtcTzinfo()
 def GetTimezoneSet():
     return set(TZINFOS.keys())
 
+def GetTimezones():
+    return TZINFOS.keys()
+
 def GetTimezoneString():
     ret = ""
     for key in TZINFOS.keys():
@@ -41,5 +44,5 @@ def GetTimezoneString():
 def GetTimezoneInfo(name):
     return TZINFOS[name]
 
-def OutputDatatime(dt, tzName):
+def OutputDatetime(dt, tzName):
     return dt.replace(tzinfo=DEFAULT_TZINFO).astimezone(GetTimezoneInfo(tzName)).strftime("%Y-%m-%d %H:%M:%S")

@@ -7,47 +7,47 @@ from google.appengine.ext import webapp
 """ my """
 from database import AuthenticatedUser
 from database import Log
-from timezone import GetTimezoneSet
+from timezone import GetTimezones
 from timezone import GetTimezoneString
-from timezone import OutputDatatime
-
-class Command(object):
-    def __init__(self, type, name, handler, help):
-        try:
-            self.__type = type
-            self.__name = name
-            self.__handler = handler
-            self.__help = help
-        except KeyError, e:
-            raise xmpp.InvalidMessageError(e[0])
-    
-    @property
-    def type(self):
-        return self.__type
-    
-    @property
-    def name(self):
-        return self.__name
-    
-    @property
-    def handler(self):
-        return self.__handler
-    
-    @property
-    def help(self):
-        return self.__help
+from timezone import OutputDatetime
 
 class XMPPHandler(webapp.RequestHandler):
+    class Command(object):
+        def __init__(self, type, name, handler, help):
+            try:
+                self.__type = type
+                self.__name = name
+                self.__handler = handler
+                self.__help = help
+            except KeyError, e:
+                raise xmpp.InvalidMessageError(e[0])
+        
+        @property
+        def type(self):
+            return self.__type
+        
+        @property
+        def name(self):
+            return self.__name
+        
+        @property
+        def handler(self):
+            return self.__handler
+        
+        @property
+        def help(self):
+            return self.__help
+
     def initialize(self, request, response):
         webapp.RequestHandler.initialize(self, request, response)
         self.users = AuthenticatedUser.all()
         self.cmds = [
-                      Command("all",    "help", self.commandHelp,           "@help")
-                     ,Command("admin",  "invite", self.commandInvite,       "@invite id@dot.com [admin|user]")
-                     ,Command("admin",  "kick", self.commandKick,           "@kick id@dot.com")
-                     ,Command("user",   "history", self.commandHistory,     "@history [0~100]")
-                     ,Command("user",   "names", self.commandNames,         "@names")
-                     ,Command("user",   "timezone", self.commandTimezone,   "@timezone %s"%(GetTimezoneString()))
+                      XMPPHandler.Command("all",    "help", self.commandHelp,           "@help")
+                     ,XMPPHandler.Command("admin",  "invite", self.commandInvite,       "@invite id@dot.com [admin|user]")
+                     ,XMPPHandler.Command("admin",  "kick", self.commandKick,           "@kick id@dot.com")
+                     ,XMPPHandler.Command("user",   "history", self.commandHistory,     "@history [0~100]")
+                     ,XMPPHandler.Command("user",   "names", self.commandNames,         "@names")
+                     ,XMPPHandler.Command("user",   "timezone", self.commandTimezone,   "@timezone %s"%(GetTimezoneString()))
                      ]
         self.Num2SendOnce = 200
         self.indexLast = -1
@@ -153,7 +153,7 @@ class XMPPHandler(webapp.RequestHandler):
         for i in range(0, num):
             jid = msgs[i].jid
             jid = jid[:jid.index("@")]
-            str += "[%s]%s..: %s\n"%(OutputDatatime(msgs[i].timestamp, timezone), jid, msgs[i].msg)
+            str += "[%s]%s..: %s\n"%(OutputDatetime(msgs[i].timestamp, timezone), jid, msgs[i].msg)
         str += "== history %d end ==\n"%(num)
         self.send2One(sender, str)
         return ""
@@ -172,14 +172,15 @@ class XMPPHandler(webapp.RequestHandler):
     
     def commandTimezone(self, sender, payload):
         ret = "Invalid user id %s"%(sender)
-        user = self.getUser(sender)
+        user = AuthenticatedUser.GetUser(sender)
+        tz = payload[1]
         if user:
-            if payload in GetTimezoneSet():
-                user.timezone = payload
+            if tz in GetTimezones():
+                user.timezone = tz
                 user.put()
-                ret = "Timezone set to %s"%(payload)
+                ret = "Timezone set to %s"%(tz)
             else:
-                ret = "Invalid timezone %s, valid options are:%s"%(payload, GetTimezoneString())
+                ret = "Invalid timezone %s, valid options are:%s"%(tz, GetTimezoneString())
         return ret
     
     def handleCommand(self, sender, cmd):

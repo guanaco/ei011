@@ -39,8 +39,7 @@ class TemplateHandler(webapp.RequestHandler):
         self.template = {"main": "", "title": self.title()}
         user = users.get_current_user()
         if user:
-            authUsers = AuthenticatedUser.all()
-            for tmpUser in authUsers:
+            for tmpUser in AuthenticatedUser.all():
                 if tmpUser.jid == user.email():
                     self.user = tmpUser
                     greeting = "%s<a href=\"%s\">(logout)</a>"%(user.nickname(), users.create_logout_url("/"))

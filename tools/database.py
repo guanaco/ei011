@@ -2,17 +2,21 @@
 
 from google.appengine.ext import db
 
-from timezone import DEFAULT_TZ
 from timezone import GetTimezoneSet
 
 class AuthenticatedUser(db.Model):
     jid = db.StringProperty(required=True)
     type = db.StringProperty(required=True, choices=set(["admin","user"]))
-    timezone = db.StringProperty(required=True, default=DEFAULT_TZ, choices=GetTimezoneSet())
+    timezone = db.StringProperty(required=True, choices=GetTimezoneSet())
     
     @classmethod
     def GetAdmins(cls):
         return db.Query(cls).filter("type =", "admin")
+    
+    @classmethod
+    def GetUser(cls, jid):
+        return db.Query(cls).filter("jid =", jid).get()
+        #return db.GqlQuery("SELECT * FROM AuthenticatedUser WHERE jid = :1", jid)
     
     @classmethod
     def Remove(cls, target):
@@ -37,7 +41,3 @@ class Log(db.Model):
     @classmethod
     def QueryByIndex(cls, start, end):
         return db.Query(cls).order("index").filter("index >=", start).filter("index <=", end)
-
-    @property
-    def nickname(self):
-        return self.jid[:self.jid.index("@")]
