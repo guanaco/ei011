@@ -1,8 +1,9 @@
 # shirui.cheng@gmail.com
 # history.html
 
-from database import Log
-from pages import TemplateHandler
+from tools.database import Log
+from pages.template import TemplateHandler
+from tools.timezone import OutputDatatime
 
 DEF_HIS_PER_PAGE = 20
 MAX_HIS_PER_PAGE = 50
@@ -58,10 +59,23 @@ class HistoryHandler(TemplateHandler):
         if end > last:
             end = last
         logs = Log.QueryByIndex(start, end)
+        html_log = ""
+        eo = "even"
+        for log in logs:
+            html_log += """
+            <tr class="%s">
+                <th scope="row">%d</td>
+                <td>%s</td>
+                <td>%s..:</td>
+                <td>%s</td>
+            </tr>
+            """%(eo, log.index, OutputDatatime(log.timestamp, self.user.timezone), log.nickname, log.msg)
+            if eo == "even": eo = "odd"
+            elif eo == "odd": eo = "even"            
         
         self.template["prev"] = ((offset + num) < last)
         self.template["next"] = ((offset - num) >= 0)
         self.template["offset"] = offset
         self.template["num"] = num
         self.template["last"] = last - 1
-        self.template["logs"] = logs
+        self.template["logs"] = html_log

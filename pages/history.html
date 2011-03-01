@@ -23,14 +23,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for log in logs %}
-            <tr class="{% cycle even,odd %}">
-                <th scope="row">{{ log.index }}</td>
-                <td>{{ log.timestamp }}</td>
-                <td>{{ log.nickname }}..:</td>
-                <td>{{ log.msg }}</td>
-            </tr>
-            {% endfor %}
+            {{ logs }}
         </tbody>
         <tfoot>
         </tfoot>

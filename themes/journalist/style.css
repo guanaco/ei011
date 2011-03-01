@@ -128,13 +128,13 @@ color: #777;
 #content table caption {
 text-align: left; 
 text-transform: uppercase;  
-padding-bottom: 10px; 
+padding-bottom: 5px; 
 /*font: 200% "Lucida Grande", "Lucida Sans Unicode", "Trebuchet MS", sans-serif;*/
 }
 
 #content table thead th {
 background: #3A4856; 
-padding: 15px 10px; 
+padding: 10px 5px; 
 color: #fff; 
 text-align: left; 
 font-weight: normal;
@@ -150,7 +150,7 @@ border-bottom: 1px solid #EAECEE;
 }
                       
 #content table tbody td, table tbody th {
-padding: 10px; 
+padding: 5px; 
 background: url("images/td_back.gif") repeat-x; 
 text-align: left;
 }
@@ -173,7 +173,7 @@ text-align: left;
 /*font: 120%  "Lucida Grande", "Lucida Sans Unicode", "Trebuchet MS", sans-serif; */
 text-transform: uppercase; 
 background: #fff; 
-padding: 10px;
+padding: 5px;
 }
 
 .comments {

@@ -1,23 +1,20 @@
 # shirui.cheng@gmail.com
 
-
 """ google app engine """
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 """ my """
-from database import AuthenticatedUser
-from im import XMPPHandler
+from tools.database import AuthenticatedUser
+from tools.xmpp import XMPPHandler
 from pages.main import MainHandler
 from pages.about import AboutHandler
 from pages.history import HistoryHandler
-from pages.oauth import OauthHandler
 
 application = webapp.WSGIApplication(
     [("/", MainHandler),
      ("/history", HistoryHandler),
      ("/about", AboutHandler),
-     ("/oauth/(.*)", OauthHandler),
      ("/_ah/xmpp/message/chat/", XMPPHandler)],
     debug=True)
 

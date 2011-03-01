@@ -1,7 +1,7 @@
 # shirui.cheng@gmail.com
 # about.html
 
-from pages import TemplateHandler
+from pages.template import TemplateHandler
 
 class AboutHandler(TemplateHandler):
     def title(self):

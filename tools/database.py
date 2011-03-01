@@ -1,12 +1,14 @@
 # shirui.cheng@gmail.com
 
 from google.appengine.ext import db
-from google.appengine.ext import search
 
+from timezone import DEFAULT_TZ
+from timezone import GetTimezoneSet
 
 class AuthenticatedUser(db.Model):
     jid = db.StringProperty(required=True)
     type = db.StringProperty(required=True, choices=set(["admin","user"]))
+    timezone = db.StringProperty(required=True, default=DEFAULT_TZ, choices=GetTimezoneSet())
     
     @classmethod
     def GetAdmins(cls):
@@ -17,7 +19,7 @@ class AuthenticatedUser(db.Model):
         query = db.Query(cls).filter("jid =", target)
         db.delete(query)
   
-class Log(search.SearchableModel):
+class Log(db.Model):
     index = db.IntegerProperty(default = -1, required=True)
     jid = db.StringProperty(required=True)
     msg = db.TextProperty(required=True)
