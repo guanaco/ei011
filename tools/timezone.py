@@ -21,7 +21,7 @@ class PstTzinfo(datetime.tzinfo):
     def olsen_name(self): return 'US/Pacific'
 
 TZINFOS = {
-  'UTC(GMT)': UtcTzinfo(),
+  'UTC(GMT)':   UtcTzinfo(),
   'CST(GMT+8)': CstTzinfo(),
   'PST(GMT-8)': PstTzinfo(),
 }

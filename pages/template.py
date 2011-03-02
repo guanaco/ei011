@@ -12,7 +12,8 @@ from google.appengine.ext.webapp import template
 """ my """
 from tools.database import AuthenticatedUser
 from tools.timezone import GetTimezoneInfo
-from tools.timezone import DEFAULT_TZINFO
+from tools.timezone import GetTimezones
+from tools.timezone import DEFAULT_TZ
 
 class TemplateHandler(webapp.RequestHandler):
     def respond(self, content):
@@ -33,6 +34,23 @@ class TemplateHandler(webapp.RequestHandler):
         """ should define """
         pass
     
+    def time(self):
+        tz = self.request.get("timezone")
+        if tz:
+            self.user.timezone = tz
+            self.user.put()
+        else:
+            if self.user:
+                tz = self.user.timezone
+            else:
+                tz = DEFAULT_TZ
+        self.template["tz_selected"] = tz
+        tzinfo = GetTimezoneInfo(tz)
+        now = datetime.now(tzinfo)
+        self.template["now"] = now.strftime("%Y-%m-%d %H:%M:%S")
+        self.template["tz"] = tz
+        self.template["timezones"] = GetTimezones()
+    
     def init(self):
         self.user = None
         self.ret = 200
@@ -48,12 +66,8 @@ class TemplateHandler(webapp.RequestHandler):
             greeting = "<a href=\"%s\">login</a>"%(users.create_login_url("/"))
             
         self.template["greeting"] = greeting
-        tzinfo = DEFAULT_TZINFO
-        if self.user:
-            tzinfo = GetTimezoneInfo(self.user.timezone)
-        now = datetime.now(tzinfo)
-        self.template["now"] = now.strftime("%Y-%m-%d %H:%M:%S")
-        self.template["tz"] = tzinfo.tzname(now)
+        self.template["this_url"] = self.request.path_qs
+        self.time()
         
     def output(self):
         """ render {{ main }} """
