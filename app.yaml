@@ -1,5 +1,5 @@
 application: ei011-bot
-version: 1-0
+version: test
 runtime: python
 api_version: 1
 

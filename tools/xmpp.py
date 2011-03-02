@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # shirui.cheng@gmail.com
 
 """ google app engine """
@@ -7,17 +9,20 @@ from google.appengine.ext import webapp
 """ my """
 from database import AuthenticatedUser
 from database import Log
+from database import Share
 from timezone import GetTimezones
 from timezone import GetTimezoneString
 from timezone import OutputDatetime
+from url import UrlParser
 
 class XMPPHandler(webapp.RequestHandler):
     class Command(object):
-        def __init__(self, type, name, handler, help):
+        def __init__(self, type, name, handler, argnum, help):
             try:
                 self.__type = type
                 self.__name = name
                 self.__handler = handler
+                self.__argnum = argnum
                 self.__help = help
             except KeyError, e:
                 raise xmpp.InvalidMessageError(e[0])
@@ -37,17 +42,22 @@ class XMPPHandler(webapp.RequestHandler):
         @property
         def help(self):
             return self.__help
+        
+        @property
+        def argnum(self):
+            return self.__argnum
 
     def initialize(self, request, response):
         webapp.RequestHandler.initialize(self, request, response)
         self.users = AuthenticatedUser.all()
         self.cmds = [
-                      XMPPHandler.Command("all",    "help", self.commandHelp,           "@help")
-                     ,XMPPHandler.Command("admin",  "invite", self.commandInvite,       "@invite id@dot.com [admin|user]")
-                     ,XMPPHandler.Command("admin",  "kick", self.commandKick,           "@kick id@dot.com")
-                     ,XMPPHandler.Command("user",   "history", self.commandHistory,     "@history [0~100]")
-                     ,XMPPHandler.Command("user",   "names", self.commandNames,         "@names")
-                     ,XMPPHandler.Command("user",   "timezone", self.commandTimezone,   "@timezone %s"%(GetTimezoneString()))
+                      XMPPHandler.Command("all",    "help", self.commandHelp,           0,  "@help")
+                     ,XMPPHandler.Command("admin",  "invite", self.commandInvite,       1,  "@invite id@dot.com [ admin | user ]")
+                     ,XMPPHandler.Command("admin",  "kick", self.commandKick,           1,  "@kick id@dot.com")
+                     ,XMPPHandler.Command("user",   "history", self.commandHistory,     0,  "@history ( 0 ~ 100 )")
+                     ,XMPPHandler.Command("user",   "names", self.commandNames,         0,  "@names")
+                     ,XMPPHandler.Command("user",   "timezone", self.commandTimezone,   1,  "@timezone %s"%(GetTimezoneString()))
+                     ,XMPPHandler.Command("user",   "share", self.commandShare,         1,  "@share (url)")
                      ]
         self.Num2SendOnce = 200
         self.indexLast = -1
@@ -106,11 +116,11 @@ class XMPPHandler(webapp.RequestHandler):
         return msg[0] == "@"
     
     def commandInvite(self, sender, payload):
-        target = payload[1]
+        target = payload[0]
         type = "user"
-        if len(payload) > 2:
-            if payload[2] in ["admin", "user"]:
-                type = payload[2]
+        if len(payload) > 1:
+            if payload[1] in ["admin", "user"]:
+                type = payload[1]
         xmpp.send_invite(target)
         u = AuthenticatedUser(key_name=target, jid=target, type=type)
         u.put()
@@ -119,7 +129,7 @@ class XMPPHandler(webapp.RequestHandler):
         return "%s invited to list."%(target)
     
     def commandKick(self, sender, payload):
-        target = payload[1]
+        target = payload[0]
         AuthenticatedUser.Remove(target)
         self.users = AuthenticatedUser.all()
         self.send2One(target, "you are deleted by %s."%(sender))
@@ -139,11 +149,11 @@ class XMPPHandler(webapp.RequestHandler):
     
     def commandHistory(self, sender, payload):
         num = 10
-        if len(payload) > 1:
+        if len(payload) > 0:
             try:
-                num = int(payload[1])
+                num = int(payload[0])
             except:
-                return "invalid payload \"%s\""%(payload[1])
+                return "invalid payload \"%s\""%(payload[0])
         if num > 100:
             num = 100
         msgs = Log.QueryByNum(num)
@@ -151,9 +161,7 @@ class XMPPHandler(webapp.RequestHandler):
         str = "== history %d begin ==\n"%(num)
         timezone = self.getUser(sender).timezone
         for i in range(0, num):
-            jid = msgs[i].jid
-            jid = jid[:jid.index("@")]
-            str += "[%s]%s..: %s\n"%(OutputDatetime(msgs[i].timestamp, timezone), jid, msgs[i].msg)
+            str += "[%s]%s..: %s\n"%(OutputDatetime(msgs[i].timestamp, timezone), self.stripJidDomain(msgs[i].jid), msgs[i].msg)
         str += "== history %d end ==\n"%(num)
         self.send2One(sender, str)
         return ""
@@ -173,7 +181,7 @@ class XMPPHandler(webapp.RequestHandler):
     def commandTimezone(self, sender, payload):
         ret = "Invalid user id %s"%(sender)
         user = AuthenticatedUser.GetUser(sender)
-        tz = payload[1]
+        tz = payload[0]
         if user:
             if tz in GetTimezones():
                 user.timezone = tz
@@ -183,8 +191,24 @@ class XMPPHandler(webapp.RequestHandler):
                 ret = "Invalid timezone %s, valid options are:%s"%(tz, GetTimezoneString())
         return ret
     
+    def commandShare(self, sender, payload):
+        url = payload[0]
+        ret = "failed to fetch url:%s"%(url)
+        parser = UrlParser()
+        if parser.open(url):
+            title = parser.getTitle()
+            index = Share.GetLastIndex() + 1
+            share = Share(index = index, jid = sender, url = url, title = title)
+            share.put()
+            msg = "%s just shared %s|%s"%(self.stripJidDomain(sender), title, url)
+            self.send2Others(sender, msg)
+            ret = "share %s|%s success."%(title, url)
+        return ret
+    
     def handleCommand(self, sender, cmd):
         words = cmd.split()
+        if len(words) <= 0:
+            return "no command inputed."
         ret = "invalid command %s."%(words[0])
         handle = False
         for c in self.cmds:
@@ -204,8 +228,8 @@ class XMPPHandler(webapp.RequestHandler):
                     if self.isAuthenticated(sender):
                         handle = True
                 break
-        if handle:
-            ret = c.handler(sender, words)
+        if handle and len(words[1:]) >= c.argnum:
+            ret = c.handler(sender, words[1:])
         return ret
 
     def isAdmin(self, jid):

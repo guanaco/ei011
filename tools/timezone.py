@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # shirui.cheng@gmail.com
 
 import datetime
@@ -37,8 +39,11 @@ def GetTimezones():
 
 def GetTimezoneString():
     ret = ""
-    for key in TZINFOS.keys():
-        ret += "%s "%(key)
+    k = TZINFOS.keys()
+    l = len(k) - 1
+    for i in range(0, l):
+        ret += " %s |"%(k[i])
+    ret += " %s"%(k[l])
     return ret
 
 def GetTimezoneInfo(name):

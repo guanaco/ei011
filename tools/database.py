@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # shirui.cheng@gmail.com
 
 from google.appengine.ext import db
@@ -16,7 +18,6 @@ class AuthenticatedUser(db.Model):
     @classmethod
     def GetUser(cls, jid):
         return db.Query(cls).filter("jid =", jid).get()
-        #return db.GqlQuery("SELECT * FROM AuthenticatedUser WHERE jid = :1", jid)
     
     @classmethod
     def Remove(cls, target):
@@ -31,7 +32,10 @@ class Log(db.Model):
     
     @classmethod
     def GetLastIndex(cls):
-        return db.Query(cls).order("-index").get().index
+        try:
+            return db.Query(cls).order("-index").get().index
+        except:
+            return -1
     
     @classmethod
     def QueryByNum(cls, num):
@@ -41,3 +45,17 @@ class Log(db.Model):
     @classmethod
     def QueryByIndex(cls, start, end):
         return db.Query(cls).order("index").filter("index >=", start).filter("index <=", end)
+    
+class Share(db.Model):
+    index = db.IntegerProperty(required=True)
+    jid = db.StringProperty(required=True)
+    url = db.TextProperty(required=True)
+    title = db.TextProperty()
+    timestamp = db.DateTimeProperty(auto_now_add=True)
+    
+    @classmethod
+    def GetLastIndex(cls):
+        try:
+            return db.Query(cls).order("-index").get().index
+        except:
+            return -1
