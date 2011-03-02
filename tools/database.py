@@ -59,3 +59,8 @@ class Share(db.Model):
             return db.Query(cls).order("-index").get().index
         except:
             return -1
+        
+    @classmethod
+    def QueryByNum(cls, num):
+        lastIndex = cls.GetLastIndex()
+        return db.Query(cls).order("index").filter("index >", lastIndex - num)

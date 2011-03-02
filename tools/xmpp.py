@@ -15,6 +15,9 @@ from timezone import GetTimezoneString
 from timezone import OutputDatetime
 from url import UrlParser
 
+LIST_DEF = 10
+LIST_MAX = 100
+
 class XMPPHandler(webapp.RequestHandler):
     class Command(object):
         def __init__(self, type, name, handler, argnum, help):
@@ -54,10 +57,10 @@ class XMPPHandler(webapp.RequestHandler):
                       XMPPHandler.Command("all",    "help", self.commandHelp,           0,  "@help")
                      ,XMPPHandler.Command("admin",  "invite", self.commandInvite,       1,  "@invite id@dot.com [ admin | user ]")
                      ,XMPPHandler.Command("admin",  "kick", self.commandKick,           1,  "@kick id@dot.com")
-                     ,XMPPHandler.Command("user",   "history", self.commandHistory,     0,  "@history ( 0 ~ 100 )")
+                     ,XMPPHandler.Command("user",   "history", self.commandHistory,     0,  "@history [ 0 ~ %s ]"%(LIST_MAX))
                      ,XMPPHandler.Command("user",   "names", self.commandNames,         0,  "@names")
                      ,XMPPHandler.Command("user",   "timezone", self.commandTimezone,   1,  "@timezone %s"%(GetTimezoneString()))
-                     ,XMPPHandler.Command("user",   "share", self.commandShare,         1,  "@share (url)")
+                     ,XMPPHandler.Command("user",   "share", self.commandShare,         0,  "@share [0 ~ %s]|(url)"%(LIST_MAX))
                      ]
         self.Num2SendOnce = 200
         self.indexLast = -1
@@ -148,20 +151,19 @@ class XMPPHandler(webapp.RequestHandler):
         return ret
     
     def commandHistory(self, sender, payload):
-        num = 10
+        num = LIST_DEF
         if len(payload) > 0:
             try:
                 num = int(payload[0])
             except:
                 return "invalid payload \"%s\""%(payload[0])
-        if num > 100:
-            num = 100
+        if num > LIST_MAX:
+            num = LIST_MAX
         msgs = Log.QueryByNum(num)
         num = msgs.count(num)
         str = "== history %d begin ==\n"%(num)
-        timezone = self.getUser(sender).timezone
         for i in range(0, num):
-            str += "[%s]%s..: %s\n"%(OutputDatetime(msgs[i].timestamp, timezone), self.stripJidDomain(msgs[i].jid), msgs[i].msg)
+            str += "[%s]%s..: %s\n"%(OutputDatetime(msgs[i].timestamp, self.getUser(sender).timezone), self.stripJidDomain(msgs[i].jid), msgs[i].msg)
         str += "== history %d end ==\n"%(num)
         self.send2One(sender, str)
         return ""
@@ -192,7 +194,31 @@ class XMPPHandler(webapp.RequestHandler):
         return ret
     
     def commandShare(self, sender, payload):
-        url = payload[0]
+        """ is there payload """
+        if len(payload):
+            """ see if a list request """
+            try:
+                num = int(payload[0])
+            except:
+                """ a doShare but not listShare """
+                num = 0
+        else:
+            num = LIST_DEF
+            
+        if num:
+            return self.listShare(sender, num)
+        else:
+            return self.doShare(sender, payload[0])
+    
+    def listShare(self, sender, num):
+        ret = ""
+        shares = Share.QueryByNum(num)
+        num = shares.count(num)
+        for i in range(0, num):
+            ret += "[%s]%s..: %s | %s"%(OutputDatetime(shares[i].timestamp, self.getUser(sender).timezone), self.stripJidDomain(shares[i].jid), shares[i].title, shares[i].url)
+        return ret
+        
+    def doShare(self, sender, url):
         ret = "failed to fetch url:%s"%(url)
         parser = UrlParser()
         if parser.open(url):
@@ -200,9 +226,9 @@ class XMPPHandler(webapp.RequestHandler):
             index = Share.GetLastIndex() + 1
             share = Share(index = index, jid = sender, url = url, title = title)
             share.put()
-            msg = "%s just shared %s|%s"%(self.stripJidDomain(sender), title, url)
+            msg = "%s.. just shared %s | %s"%(self.stripJidDomain(sender), title, url)
             self.send2Others(sender, msg)
-            ret = "share %s|%s success."%(title, url)
+            ret = "share %s | %s success."%(title, url)
         return ret
     
     def handleCommand(self, sender, cmd):
