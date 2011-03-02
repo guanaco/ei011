@@ -25,6 +25,20 @@
                     <li><a href="/about">about</a></li>
                 </ul>
             </div>
+            <form action="{{ this_url }}" method="post">
+                <p>Timezone:</p>
+                <select name="timezone" />
+                    {% for tz in timezones %}
+                        {% ifequal tz tz_selected %}
+                            <option value="{{ tz }}" selected="selected">{{ tz }}</option>
+                        {% endifequal %}
+                        {% ifnotequal tz tz_selected %}
+                            <option value="{{ tz }}">{{ tz }}</option>
+                        {% endifnotequal %}
+                    {% endfor %}
+                </select>
+                <input type="submit" value="Go">
+            </form>
         </div>
     </div>
     <div id="footer">
