@@ -28,7 +28,7 @@ TZINFOS = {
   'PST(GMT-8)': PstTzinfo(),
 }
 
-DEFAULT_TZ = "CST(GMT+8)"
+DEFAULT_TZ = 'CST(GMT+8)'
 DEFAULT_TZINFO = UtcTzinfo()
 
 def GetTimezoneSet():
@@ -38,16 +38,16 @@ def GetTimezones():
     return TZINFOS.keys()
 
 def GetTimezoneString():
-    ret = ""
+    ret = ''
     k = TZINFOS.keys()
     l = len(k) - 1
     for i in range(0, l):
-        ret += " %s |"%(k[i])
-    ret += " %s"%(k[l])
+        ret += ' %s |'%(k[i])
+    ret += ' %s'%(k[l])
     return ret
 
 def GetTimezoneInfo(name):
     return TZINFOS[name]
 
 def OutputDatetime(dt, tzName):
-    return dt.replace(tzinfo=DEFAULT_TZINFO).astimezone(GetTimezoneInfo(tzName)).strftime("%Y-%m-%d %H:%M:%S")
+    return dt.replace(tzinfo=DEFAULT_TZINFO).astimezone(GetTimezoneInfo(tzName)).strftime('%Y-%m-%d %H:%M:%S')

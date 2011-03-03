@@ -12,14 +12,14 @@ MAX_HIS_PER_PAGE = 50
 
 class HistoryHandler(TemplateHandler):
     def title(self):
-        return "History"
+        return 'History'
     
     def main(self):
-        return "history"
+        return 'history'
             
     def parseNum(self):
         num = DEF_HIS_PER_PAGE
-        numStr = self.request.get("num")
+        numStr = self.request.get('num')
         if numStr:
             try:
                 num = int(numStr)
@@ -33,13 +33,13 @@ class HistoryHandler(TemplateHandler):
                 
     def parseOffset(self):
         offset = 0
-        offsetStr = self.request.get("offset")
+        offsetStr = self.request.get('offset')
         if offsetStr:
             offset = int(offsetStr)
         return offset
             
     def parseDirection(self):
-        return self.request.get("direction")
+        return self.request.get('direction')
                                    
     def process(self, method):
         num = self.parseNum()
@@ -47,10 +47,10 @@ class HistoryHandler(TemplateHandler):
         direction = self.parseDirection()
         
         last = Log.GetLastIndex() + 1
-        if direction == "prev":
+        if direction == 'prev':
             if offset + num < last:
                 offset += num
-        elif direction == "next":
+        elif direction == 'next':
             if offset - num >= 0:
                 offset -= num
 
@@ -61,23 +61,23 @@ class HistoryHandler(TemplateHandler):
         if end > last:
             end = last
         logs = Log.QueryByIndex(start, end)
-        html_log = ""
-        eo = "even"
+        html_log = ''
+        eo = 'even'
         for log in logs:
-            html_log += """
-            <tr class="%s">
-                <th scope="row">%d</td>
+            html_log += '''
+            <tr class='%s'>
+                <th scope='row'>%d</td>
                 <td>%s</td>
                 <td>%s..:</td>
                 <td>%s</td>
             </tr>
-            """%(eo, log.index, OutputDatetime(log.timestamp, self.user.timezone), log.jid[:log.jid.index("@")], log.msg)
-            if eo == "even": eo = "odd"
-            elif eo == "odd": eo = "even"            
+            '''%(eo, log.index, OutputDatetime(log.timestamp, self.user.timezone), log.jid[:log.jid.index('@')], log.msg)
+            if eo == 'even': eo = 'odd'
+            elif eo == 'odd': eo = 'even'            
         
-        self.template["prev"] = ((offset + num) < last)
-        self.template["next"] = ((offset - num) >= 0)
-        self.template["offset"] = offset
-        self.template["num"] = num
-        self.template["last"] = last - 1
-        self.template["logs"] = html_log
+        self.template['prev'] = ((offset + num) < last)
+        self.template['next'] = ((offset - num) >= 0)
+        self.template['offset'] = offset
+        self.template['num'] = num
+        self.template['last'] = last - 1
+        self.template['logs'] = html_log

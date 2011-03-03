@@ -2,46 +2,59 @@
 # -*- coding: utf-8 -*-
 # shirui.cheng@gmail.com
 
-from google.appengine.api import urlfetch
+import logging
+import urllib2
+import re
+
+class HtmlChecker:
+    def __init__(self, line, pattern, collector):
+        self.pattern = pattern
+        self.collector = collector
+    
+    @property
+    def pattern(self):
+        return self.pattern
+    
+    @property
+    def collector(self):
+        return self.collector
 
 class UrlParser:
     def __init__(self):
-        self.fetched = None
+        self.title = None
+        self.charset = None
+        self.checkers = {
+                          HtmlChecker('<\stitle\s>*</\stitle\s>', self.title)
+                         ,HtmlChecker(('<\s*meta[^>]+charset=([^>]*?)[;\'">]', re.I), self.charset)
+                         }
         
-    def status_ok(self):
-        try: 
-            return self.fetched.status_code == 200
-        except:
-            return False
+    def log(self, msg):
+        logging.debug('--- csr ---:%s'%(msg))
+        
+    def fixUrl(self, url):
+        if url[:'https://'] not in ['http://', 'https://']:
+            url = 'http://'+url
+            
+    def check(self, line, checker):
+        ret = None
+        regexp = re.compile(checker.pattern)
+        found = regexp.search(line)
+        if found:
+            ret = found.groups()[0]
+            try:
+                ret = ret.lower()
+            except:
+                pass
+        checker.collector = ret
+        return ret is not None
         
     def open(self, url):
-        try:
-            self.fetched = urlfetch.fetch(url = url, deadline = 10)
-        except:
-            pass
-        return self.status_ok()
-        
-    def getTitle(self):
-        title = ""
-        if self.status_ok():
-            content = self.fetched.content
-            title = content[(content.index("<title>") + len("<title>")):content.index("</title>")].decode(self.getCharset())
-        return title
-    
-    def getCharset(self):
-        charset = "utf-8"
-        if self.status_ok():
-            content = self.fetched.content
-            while len(content):
-                """ search <meta ...> """
-                start = content.index("<meta ")
-                end = content[start:].index(">")
-                meta = content[start:end]
-                try:
-                    i = meta.index("charset=") + len("charset=")
-                    j = meta[i:].index("\"")
-                    charset = meta[i:j].lower()
-                    break
-                except:
-                    content = content[end+1:]
-        return charset
+        req = urllib2.urlopen(self.fixUrl(url))
+        found = 0
+        for line in req.readlines():
+            for c in self.checkers:
+                self.check(line, c)
+            
+    @property
+    def title(self):
+        return self.title

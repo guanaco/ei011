@@ -7,7 +7,7 @@ from pages.template import TemplateHandler
 
 class AboutHandler(TemplateHandler):
     def title(self):
-        return "About"
+        return 'About'
     
     def main(self):
-        return "about"
+        return 'about'
