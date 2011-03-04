@@ -28,39 +28,19 @@ class Command(object):
             self.help = help
         except KeyError, e:
             raise xmpp.InvalidMessageError(e[0])
-    
-    @property
-    def type(self):
-        return self.type
-    
-    @property
-    def name(self):
-        return self.name
-    
-    @property
-    def handler(self):
-        return self.handler
-    
-    @property
-    def help(self):
-        return self.help
-    
-    @property
-    def argnum(self):
-        return self.argnum
 
 class XMPPHandler(webapp.RequestHandler):
     def initialize(self, request, response):
         webapp.RequestHandler.initialize(self, request, response)
         self.users = AuthenticatedUser.all()
         self.cmds = [
-                      XMPPHandler.Command('all',    'help', self.commandHelp,           0,  '@help')
-                     ,XMPPHandler.Command('admin',  'invite', self.commandInvite,       1,  '@invite id@dot.com [ admin | user ]')
-                     ,XMPPHandler.Command('admin',  'kick', self.commandKick,           1,  '@kick id@dot.com')
-                     ,XMPPHandler.Command('user',   'history', self.commandHistory,     0,  '@history [ 0 ~ %s ]'%(LIST_MAX))
-                     ,XMPPHandler.Command('user',   'names', self.commandNames,         0,  '@names')
-                     ,XMPPHandler.Command('user',   'timezone', self.commandTimezone,   1,  '@timezone %s'%(GetTimezoneString()))
-                     ,XMPPHandler.Command('user',   'share', self.commandShare,         0,  '@share [0 ~ %s]|(url)'%(LIST_MAX))
+                      Command('all',    'help', self.commandHelp,           0,  '@help')
+                     ,Command('admin',  'invite', self.commandInvite,       1,  '@invite id@dot.com [ admin | user ]')
+                     ,Command('admin',  'kick', self.commandKick,           1,  '@kick id@dot.com')
+                     ,Command('user',   'history', self.commandHistory,     0,  '@history [ 0 ~ %s ]'%(LIST_MAX))
+                     ,Command('user',   'names', self.commandNames,         0,  '@names')
+                     ,Command('user',   'timezone', self.commandTimezone,   1,  '@timezone %s'%(GetTimezoneString()))
+                     ,Command('user',   'share', self.commandShare,         0,  '@share [0 ~ %s]|(url)'%(LIST_MAX))
                      ]
         self.Num2SendOnce = 200
         self.indexLast = -1
@@ -222,9 +202,11 @@ class XMPPHandler(webapp.RequestHandler):
     def doShare(self, sender, url):
         ret = 'failed to fetch url:%s'%(url)
         parser = UrlParser()
-        opened, url = parser.open(url)
-        if opened:
-            title = parser.getTitle()
+        processed, url = parser.process(url)
+        if processed:
+            title = parser.title
+            if not title:
+                title = '{ title parse failed }'
             index = Share.GetLastIndex() + 1
             share = Share(index = index, jid = sender, url = url, title = title)
             share.put()
