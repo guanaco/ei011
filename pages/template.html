@@ -1,24 +1,25 @@
-<html>
+﻿<html>
 <head>
     <title>{{ title }}</title>
     <link type="text/css" rel="stylesheet" href="/themes/journalist/style.css"/>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
 </head>
 <body>
     <div id="container" class="group">
         <h1><a href="/">EI011</a> of <a href="http://www.hust.edu.cn/">HUST</a></h1>
-        <div id="navigation" class="group">
-            <div class="alignright">
-                    
-
-            </div>
-        </div>
         <div id="bubble">
             <p>hust ei011 alumni internal use only.</p>
         </div>
-        {{ main }}
+        {{ main|safe }}
         <div id="sidebar">
             <div id="pages">
-                <h3>{{ greeting }}</h3>
+                <h3>
+                {% if loggedIn %}
+                    {{ userName }}<a href="{{ logoutUrl }}">(logout)</a>
+                {% else %}
+                    <a href="{{ loginUrl }}">login</a>
+                {% endif %}    
+                </h3>
                 <ul>
                     <li><a href="/">home</a></li>
                     <li><a href="/history">history</a></li>
@@ -27,7 +28,7 @@
             </div>
             <form action="{{ this_url }}" method="post">
                 <p>Timezone:</p>
-                <select name="timezone" />
+                <select name="timezone">
                     {% for tz in timezones %}
                         {% ifequal tz tz_selected %}
                             <option value="{{ tz }}" selected="selected">{{ tz }}</option>
@@ -43,13 +44,12 @@
     </div>
     <div id="footer">
         <p>
-            v1.0 by <a href="http://about.me/shirui.cheng">Shirui Cheng</a> @ 2011 with 
+            v1.1 by <a href="http://about.me/shirui.cheng">Shirui Cheng</a> @ 2011 with 
             <a href="http://theme.wordpress.com/themes/journalist/">The Journalist</a> theme and
             <a href="http://icant.co.uk/csstablegallery/tables/33.php">Winter Blues</a> table
         </p>
         <p>
-            Powered by <a href="http://code.google.com/appengine/">Google App Engine</a> and
-            <a href="http://chardet.feedparser.org">chardet</a>
+            Powered by <a href="http://code.google.com/appengine/">Google App Engine</a>
         </p>
         <p>
             Generated @ {{ now }} {{ tz }}

@@ -2,25 +2,22 @@
 # -*- coding: utf-8 -*-
 # shirui.cheng@gmail.com
 
-import logging
 import urllib2
 import re
 
+from debug import dbg
+
 class HtmlChecker:
-    def __init__(self, pattern, flag, collector):
+    def __init__(self, name, pattern, flag, collector):
+        self.name = name
         self.pattern = pattern
         self.flag = flag
         self.collector = collector
 
 class UrlParser:
     def __init__(self):
-        self.checkers = {
-                          'title': HtmlChecker('<\s*title\s*>.*?</\s*title\s*>', 0, None)
-                         ,'charset': HtmlChecker('<\s*meta[^>]+charset=([^>]*?)[;\'">]', re.I, None)
-                        }
-        
-    def log(self, msg):
-        logging.debug('--- csr ---:%s'%(msg))
+        self.titleChecker = HtmlChecker('title', '<\s*title\s*>(.*?)</\s*title\s*>', re.IGNORECASE, None)
+        self.encodingChecker = HtmlChecker('encoding', '<\s*meta[^>]+charset=([^>]*?)[;\'">]', re.IGNORECASE, None)
         
     def fixUrl(self, url):
         if url[:len('https://')] not in ['http://', 'https://']:
@@ -35,31 +32,31 @@ class UrlParser:
             ret = found.groups()[0]
         checker.collector = ret
         return ret is not None
-    
-    def convertTitle(self):
-        charset = 'utf-8'
-        if self.checkers['charset'].collector:
-            charset = self.checkers['charset'].collector.lower()
-            self.log('using detected encoding %s.'%(charset))
-        if self.checkers['title'].collector:
-            self.checkers['title'].collector = self.checkers['title'].collector.decode(charset, 'ignore')
+            
+    def search(self, url, checker, encoding=None):
+        found = False
+        try:
+            req = urllib2.urlopen(url)
+            for line in req.readlines():
+                if encoding:
+                    line = line.decode(encoding, 'replace')
+                found = self.check(line, checker)
+                if found:
+                    dbg(checker.name+' found: '+checker.collector)
+                    break
+            req.close()
+        except:
+            pass
+        return found
         
     def process(self, url):
         url = self.fixUrl(url)
-        req = urllib2.urlopen(url)
-        if req:
-            found = 0
-            for line in req.readlines():
-                for k, c in self.checkers.items():
-                    if self.check(line, c):
-                        found += 1
-                        self.log('found %s: %s'%(k, c.collector))
-                if found > len(self.checkers):
-                    ''' process done '''
-                    break
-        self.convertTitle()
-        return req is not None, url
+        self.search(url, self.encodingChecker)
+        encoding = 'utf-8'
+        if self.encodingChecker.collector:
+            encoding = self.encodingChecker.collector.lower()
+        return self.search(url, self.titleChecker, encoding), url
         
     @property
     def title(self):
-        return self.checkers['title'].collector
+        return self.titleChecker.collector

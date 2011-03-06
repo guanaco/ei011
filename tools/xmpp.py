@@ -37,10 +37,10 @@ class XMPPHandler(webapp.RequestHandler):
                       Command('all',    'help', self.commandHelp,           0,  '@help')
                      ,Command('admin',  'invite', self.commandInvite,       1,  '@invite id@dot.com [ admin | user ]')
                      ,Command('admin',  'kick', self.commandKick,           1,  '@kick id@dot.com')
-                     ,Command('user',   'history', self.commandHistory,     0,  '@history [ 0 ~ %s ]'%(LIST_MAX))
+                     ,Command('user',   'history', self.commandHistory,     0,  '@history [ 1 ~ %s ]'%(LIST_MAX))
                      ,Command('user',   'names', self.commandNames,         0,  '@names')
                      ,Command('user',   'timezone', self.commandTimezone,   1,  '@timezone %s'%(GetTimezoneString()))
-                     ,Command('user',   'share', self.commandShare,         0,  '@share [0 ~ %s]|(url)'%(LIST_MAX))
+                     ,Command('user',   'share', self.commandShare,         0,  '@share [1 ~ %s]|(url)'%(LIST_MAX))
                      ]
         self.Num2SendOnce = 200
         self.indexLast = -1
@@ -119,7 +119,7 @@ class XMPPHandler(webapp.RequestHandler):
         return '%s kicked from list.'%(target)
     
     def commandHelp(self, sender, payload):
-        ret = 'http://ei011-bot.appspot.com\navailable commands:\n'
+        ret = 'https://ei011-bot.appspot.com\navailable commands:\n'
         for c in self.cmds:
             toAdd = True
             if c.type == 'admin' and not self.isAdmin(sender):
@@ -200,9 +200,9 @@ class XMPPHandler(webapp.RequestHandler):
         return ret
         
     def doShare(self, sender, url):
-        ret = 'failed to fetch url:%s'%(url)
         parser = UrlParser()
         processed, url = parser.process(url)
+        ret = 'failed to fetch url:%s'%(url)
         if processed:
             title = parser.title
             if not title:

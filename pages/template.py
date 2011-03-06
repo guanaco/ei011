@@ -63,12 +63,14 @@ class TemplateHandler(webapp.RequestHandler):
             for tmpUser in AuthenticatedUser.all():
                 if tmpUser.jid == user.email():
                     self.user = tmpUser
-                    greeting = '%s<a href=\'%s\'>(logout)</a>'%(user.nickname(), users.create_logout_url('/'))
+                    self.template['loggedIn'] = True
+                    self.template['userName'] = user.nickname()
+                    self.template['logoutUrl'] = users.create_logout_url('/')
                     break
         else:
-            greeting = '<a href=\'%s\'>login</a>'%(users.create_login_url('/'))
+            self.template['loggedIn'] = False
+            self.template['loginUrl'] = users.create_login_url('/')
             
-        self.template['greeting'] = greeting
         self.template['this_url'] = self.request.path_qs
         self.time()
         

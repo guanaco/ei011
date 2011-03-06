@@ -1,4 +1,4 @@
-<div id="content" class="group">
+﻿<div id="content" class="group">
     <h2>Brower History</h2>
     <form action="/history" method="get">
         Jump to (0 ~ {{ last }}): 
@@ -23,7 +23,7 @@
             </tr>
         </thead>
         <tbody>
-            {{ logs }}
+            {{ logs|safe }}
         </tbody>
         <tfoot>
         </tfoot>
